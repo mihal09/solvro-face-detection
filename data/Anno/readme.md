@@ -1,0 +1,1 @@
+list_landmarks_celeba.txt should be in this folder
