@@ -33,6 +33,38 @@ def get_basic_big_model(freeze=True):
     return model, backbone_model
 
 
+class BasicModel:
+    def __init__(self):
+        shape = (224, 224, 3)
+        input_layer = keras.layers.Input(shape=shape)
+        self.backbone_model = keras.applications.ResNet50V2(include_top=False, input_shape=shape)
+        output = self.backbone_model(input_layer)
+        output = GlobalAveragePooling2D()(output)
+        output = Flatten()(output)
+        output = BatchNormalization()(output)
+        output = Dense(256, activation='relu')(output)
+        output = BatchNormalization()(output)
+        output = Dropout(0.5)(output)
+        output = Dense(2, activation='sigmoid')(output)
+        self.model = Model(input_layer, output)
+
+        adam = keras.optimizers.Adam(learning_rate=5e-4)
+        self.model.compile(optimizer=adam,
+                      loss='mean_squared_error',
+                      metrics=[])
+
+    def get_backbone(self):
+        return self.backbone_model
+
+    def get_model(self):
+        return self.model
+
+    def load_model(self, path):
+        self.model = keras.models.load_model(path)
+
+    def modify_generator(self, generator):
+        return generator
+
 def get_haar_model():
     class HaarModel:
         def __init__(self):
