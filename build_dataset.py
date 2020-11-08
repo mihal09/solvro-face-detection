@@ -4,8 +4,8 @@ import pandas as pd
 import cv2
 import numpy as np
 from focal_loss import BinaryFocalLoss
-dir_anno = "../data/CelebA/Anno/"
-dir_images = "../data/CelebA/img_celeba/"
+dir_anno = "CelebA/Anno/"
+dir_images = "CelebA/img_celeba/"
 
 df = pd.read_csv(dir_anno + "list_landmarks_celeba.txt",
                  header=None,
