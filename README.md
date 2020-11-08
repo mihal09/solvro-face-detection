@@ -1,1 +1,1 @@
-"# solvro-face-detection" 
+Patrz info.pdf
