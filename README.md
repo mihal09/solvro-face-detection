@@ -42,7 +42,8 @@ python build_dataset.py
 In order to **train** the model, run:
 
 ```
-python train_model.py
+python train_model.py --model basic --path basic_model
+python train_model.py --model pyramid --path pyramid_model
 ```
 
 ## Evaluate Model
