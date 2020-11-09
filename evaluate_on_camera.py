@@ -3,13 +3,18 @@ import argparse
 import numpy as np
 from tensorflow import keras
 from tensorflow.keras.applications.resnet_v2 import preprocess_input
+from basic_model import BasicModel
+from pyramid_model import PyramidModel
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', required=True,
-                    help="Path to the model")
+                    help="Model type: basic, pyramid")
+
+parser.add_argument('--path', required=True,
+                    help="Model path")
 
 
-def predict_video(model):
+def predict_video(model_class):
     cap = cv2.VideoCapture(0)
 
     while True:
@@ -17,8 +22,12 @@ def predict_video(model):
 
         height, width, _ = frame.shape
 
-        frame_preprocessed = preprocess_input(frame).reshape(1, height, width, 3)
-        x_scaled, y_scaled = model.predict(frame_preprocessed)[0]
+        if type(model_class) == BasicModel:
+            frame_resized = cv2.resize(frame, (224, 224))
+            frame_preprocessed = preprocess_input(frame_resized).reshape(1, 224, 224, 3)
+        else:
+            frame_preprocessed = preprocess_input(frame).reshape(1, height, width, 3)
+        x_scaled, y_scaled = model_class.predict(frame_preprocessed)[0]
 
         x = int(x_scaled * width)
         y = int(y_scaled * height)
@@ -38,10 +47,14 @@ def predict_video(model):
 if __name__ == "__main__":
     args = parser.parse_args()
     try:
-        from PyramidModel import PyramidModel
-        pyramid_model = PyramidModel()
-        pyramid_model.load_model(args.model)
-        predict_video(pyramid_model)
-
+        if args.model == 'basic':
+            model_class = BasicModel()
+        elif args.model == 'pyramid':
+            model_class = PyramidModel()
+        else:
+            raise Exception("available model types: basic, pyramid")
+        model_class.load_model(args.path)
+        predict_video(model_class)
     except Exception as e:
         print(e)
+

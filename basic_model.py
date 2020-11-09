@@ -62,8 +62,15 @@ class BasicModel:
     def load_model(self, path):
         self.model = keras.models.load_model(path)
 
+    def predict(self, data):
+        y_pred = self.get_model().predict(data)
+        return self.transform_prediction(y_pred)
+
     def modify_generator(self, generator):
         return generator
+
+    def transform_prediction(self, prediction):
+        return prediction
 
 def get_haar_model():
     class HaarModel:
