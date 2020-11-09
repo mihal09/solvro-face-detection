@@ -24,6 +24,52 @@ class ResNetBackbone:
                                 for (shortcut, layer_name) in layer_names.items()}
 
 
+class PyramidModel:
+    def __init__(self, backbone=ResNetBackbone()):
+        self.backbone = backbone
+        self.input = self.backbone.input
+
+        last_layer = _create_pyramid_features(backbone_layers=self.backbone.backbone_layers, feature_size=256)
+        regression_model = default_regression_model(pyramid_feature_size=256, feature_size=256, output_size=1)
+        output = regression_model(last_layer)
+        self.model = keras.models.Model(inputs=self.input, outputs=output)
+
+        adam = keras.optimizers.Adam(learning_rate=5e-4)
+        self.model.compile(optimizer=adam,
+                           loss=BinaryFocalLoss(gamma=2.0),
+                           metrics=[])
+
+    def get_backbone(self):
+        return self.backbone.backbone_model
+
+    def get_model(self):
+        return self.model
+
+    def predict(self, data):
+        y_pred = self.model.predict(data)
+        return self.transform_prediction(y_pred)
+
+    def transform_prediction(self, prediction):
+        y_pred = prediction
+        y_pred = y_pred.reshape(-1, y_pred.shape[1], y_pred.shape[2])
+        y_pred_shape = y_pred[0].shape
+        outputs = []
+        n = y_pred.shape[0]
+        for i in range(n):
+            y, x = np.unravel_index(np.argmax(y_pred[i], axis=None), y_pred_shape)
+            y /= y_pred_shape[0]
+            x /= y_pred_shape[1]
+            outputs.append([x, y])
+
+        return np.array(outputs)
+
+    def load_model(self, path):
+        self.model = keras.models.load_model(path)
+
+    def modify_generator(self, generator):
+        return WrapGenerator(generator).generator_function()
+
+
 def resize_images(images, size, method='bilinear', align_corners=False):
     """ See https://www.tensorflow.org/versions/r1.14/api_docs/python/tf/image/resize_images .
     Args
@@ -36,6 +82,31 @@ def resize_images(images, size, method='bilinear', align_corners=False):
         'area': tensorflow.image.ResizeMethod.AREA,
     }
     return tensorflow.compat.v1.image.resize_images(images, size, methods[method], align_corners)
+
+
+def _create_pyramid_features(backbone_layers, feature_size=256):
+    P5 = keras.layers.Conv2D(feature_size, kernel_size=1, strides=1, padding='same', name='C5_reduced')(
+        backbone_layers['C5'])
+    P5_upsampled = UpsampleLike(name='P5_upsampled')([P5, backbone_layers['C4']])
+
+    # add P5 elementwise to C4
+    P4 = keras.layers.Conv2D(feature_size, kernel_size=1, strides=1, padding='same', name='C4_reduced')(
+        backbone_layers['C4'])
+    P4 = keras.layers.Add(name='P4_merged')([P5_upsampled, P4])
+    P4_upsampled = UpsampleLike(name='P4_upsampled')([P4, backbone_layers['C3']])
+
+    # add P4 elementwise to C3
+    P3 = keras.layers.Conv2D(feature_size, kernel_size=1, strides=1, padding='same', name='C3_reduced')(
+        backbone_layers['C3'])
+    P3 = keras.layers.Add(name='P3_merged')([P4_upsampled, P3])
+    P3_upsampled = UpsampleLike(name='P3_upsampled')([P3, backbone_layers['C2']])
+
+    P2 = keras.layers.Conv2D(feature_size, kernel_size=1, strides=1, padding='same', name='C2_reduced')(
+        backbone_layers['C2'])
+    P2 = keras.layers.Add(name='P2_merged')([P3_upsampled, P2])
+    P2 = keras.layers.Conv2D(feature_size, kernel_size=3, strides=1, padding='same', name='P2')(P2)
+
+    return P2
 
 
 class UpsampleLike(keras.layers.Layer):
@@ -87,66 +158,19 @@ def default_regression_model(pyramid_feature_size=256, feature_size=256, output_
     return keras.models.Model(inputs=inputs, outputs=outputs)
 
 
-def _create_pyramid_features(backbone_layers, feature_size=256):
-    P5 = keras.layers.Conv2D(feature_size, kernel_size=1, strides=1, padding='same', name='C5_reduced')(
-        backbone_layers['C5'])
-    P5_upsampled = UpsampleLike(name='P5_upsampled')([P5, backbone_layers['C4']])
+class WrapGenerator:
+    def __init__(self, generator):
+        self.generator = generator
 
-    # add P5 elementwise to C4
-    P4 = keras.layers.Conv2D(feature_size, kernel_size=1, strides=1, padding='same', name='C4_reduced')(
-        backbone_layers['C4'])
-    P4 = keras.layers.Add(name='P4_merged')([P5_upsampled, P4])
-    P4_upsampled = UpsampleLike(name='P4_upsampled')([P4, backbone_layers['C3']])
-
-    # add P4 elementwise to C3
-    P3 = keras.layers.Conv2D(feature_size, kernel_size=1, strides=1, padding='same', name='C3_reduced')(
-        backbone_layers['C3'])
-    P3 = keras.layers.Add(name='P3_merged')([P4_upsampled, P3])
-    P3_upsampled = UpsampleLike(name='P3_upsampled')([P3, backbone_layers['C2']])
-
-    P2 = keras.layers.Conv2D(feature_size, kernel_size=1, strides=1, padding='same', name='C2_reduced')(
-        backbone_layers['C2'])
-    P2 = keras.layers.Add(name='P2_merged')([P3_upsampled, P2])
-    P2 = keras.layers.Conv2D(feature_size, kernel_size=3, strides=1, padding='same', name='P2')(P2)
-
-    return P2
-
-
-class PyramidModel:
-    def __init__(self, backbone=ResNetBackbone()):
-        self.backbone = backbone
-        self.input = self.backbone.input
-
-        last_layer = _create_pyramid_features(backbone_layers=self.backbone.backbone_layers, feature_size=256)
-        regression_model = default_regression_model(pyramid_feature_size=256, feature_size=256, output_size=1)
-        output = regression_model(last_layer)
-        self.model = keras.models.Model(inputs=self.input, outputs=output)
-
-        adam = keras.optimizers.Adam(learning_rate=5e-4)
-        self.model.compile(optimizer=adam,
-                           loss=BinaryFocalLoss(gamma=2.0),
-                           metrics=[])
-
-    def get_model(self):
-        return self.model
-
-    def predict(self, data):
-        y_pred = self.model.predict(data)
-        return self.transform_prediction(y_pred)
-
-    def transform_prediction(self, prediction):
-        y_pred = prediction
-        y_pred = y_pred.reshape(-1, y_pred.shape[1], y_pred.shape[2])
-        y_pred_shape = y_pred[0].shape
-        outputs = []
-        n = y_pred.shape[0]
-        for i in range(n):
-            y, x = np.unravel_index(np.argmax(y_pred[i], axis=None), y_pred_shape)
-            y /= y_pred_shape[0]
-            x /= y_pred_shape[1]
-            outputs.append([x, y])
-
-        return np.array(outputs)
-
-    def load_model(self, path):
-        self.model = keras.models.load_model(path)
+    def generator_function(self):
+        while True:  # Select files (paths/indices) for the batch
+            x, y = self.generator.next()
+            n = x.shape[0]
+            size_x = x.shape[2] // 4
+            size_y = x.shape[1] // 4
+            y_new = np.zeros((n, size_y, size_x, 1))
+            for i in range(n):
+                x_pos = int(y[i, 0] * (size_x - 1))
+                y_pos = int(y[i, 1] * (size_y - 1))
+                y_new[i, y_pos - 5:y_pos + 5, x_pos - 5:x_pos + 5, 0] = 1.0
+            yield x, y_new
