@@ -49,7 +49,15 @@ python train_model.py --model pyramid --path pyramid_model
 ## Evaluate Model
 To see how the model performs on the test data, run:
 ```
-python evaluate_model.py
+python evaluate.py --model basic --path basic_model
+python evaluate.py --model pyramid --path pyramid_model
 ```
+
+To see how the model performs on your camera, run: 
+```
+python evaluate_on_camera.py --model basic --path basic_model
+python evaluate_on_camera.py --model pyramid --path pyramid_model
+```
+
 
 [celeba]: http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html
