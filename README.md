@@ -1,10 +1,10 @@
-Będzie gotowe za tydzień. Informacje o projekcie w info.pdf
-
-# Szukanie środka twarzy 
-
+# Szukanie środka twarzy - Solvro Machine Learning
 _Author: Michał Janik_
 
-Finding the center of the face in the photo
+Informacje o projekcie znajdują się w pliku  *info.pdf*.
+Poniżej znajdują się szczegóły, jak wywoływać kod.
+
+
 
 ## Install requirements
 
