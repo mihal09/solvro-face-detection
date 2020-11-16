@@ -2,9 +2,10 @@
 _Author: Michał Janik_
 
 Informacje o projekcie znajdują się w pliku  *info.pdf*.
-Poniżej znajdują się szczegóły, jak wywoływać kod.
 
+## Results of the pyramid feature model on sample images
 
+![Results](/images/results.png)
 
 ## Install requirements
 
